@@ -6,7 +6,7 @@ namespace BeeAZ\AcidIsland;
 
 use BeeAZ\AcidIsland\commands\AICommand;
 use BeeAZ\AcidIsland\generator\Basic\Basic;
-use BeeAZ\AcidIsland\provider\SQLiteProvider;
+use BeeAZ\AcidIsland\commands\subcommand\join;
 use pocketmine\event\Listener;
 use pocketmine\item\LegacyStringToItemParser;
 use pocketmine\network\mcpe\protocol\PlaySoundPacket;
@@ -27,12 +27,6 @@ class AcidIsland extends PluginBase implements Listener {
 
 	private static AcidIsland $instance;
 
-	public SQLiteProvider $provider;
-
-	public mixed $prepare;
-
-	public mixed $result;
-
 	public function onEnable() : void {
 		self::$instance = $this;
 		$this->getServer()->getPluginManager()->registerEvents(new EventListener($this), $this);
@@ -41,17 +35,11 @@ class AcidIsland extends PluginBase implements Listener {
 		$this->cfg = new Config($this->getDataFolder() . "config.yml", Config::YAML);
 		@mkdir($this->getDataFolder() . "islands/");
 		$this->getServer()->getCommandMap()->register($this->getDescription()->getName(), new AICommand($this));
-		$this->provider = new SQLiteProvider($this);
-		$this->provider->initDataBase();
 		$this->checkConfig();
 	}
 
 	public static function getInstance() : AcidIsland {
 		return self::$instance;
-	}
-
-	public function getProvider() : SQLiteProvider {
-		return $this->provider;
 	}
 
 	public function checkConfig() {
@@ -68,11 +56,15 @@ class AcidIsland extends PluginBase implements Listener {
 		return $this->getServer()->getWorldManager()->isWorldGenerated("ai-" . $name);
 	}
 
+
 	public function createData(Player $player) {
 		$name = strtolower($player->getName());
 		$this->setData($name, "member", $name);
 		$this->setData($name, "lock", false);
 		$this->setData($name, "pvp", false);
+		Server::getInstance()->getWorldManager()->loadWorld("ai-" . $name);
+		$player->teleport(new Position(7, 65, 5, Server::getInstance()->getWorldManager()->getWorldByName("ai-" . $name)));
+		$player->sendMessage($ai->cfg->get("ISLAND-JOIN"));
 		foreach ($this->cfg->get("start-item") as $start) {
 			$item = explode(":", $start);
 			$player->getInventory()->addItem(LegacyStringToItemParser::getInstance()->parse((int) $item[0].':'.(int) $item[1])->setCount((int) $item[2]));
@@ -107,8 +99,5 @@ class AcidIsland extends PluginBase implements Listener {
 		$cfg = new Config($dir . "$name.yml", Config::YAML);
 		$cfg->set($key, $data);
 		$cfg->save();
-	}
-	public function onDisable() : void {
-		$this->getProvider()->db->close();
 	}
 }
